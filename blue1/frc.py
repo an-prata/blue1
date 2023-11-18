@@ -111,6 +111,9 @@ class Match:
     red_alliance_score:  Optional[int]
     blue_alliance_score: Optional[int]
 
+    red_alliance_rp_awarded:  Optional[int]
+    blue_alliance_rp_awarded: Optional[int]
+
     red_alliance_score_breakdown:  Optional[dict]
     blue_alliance_score_breakdown: Optional[dict]
 
@@ -131,6 +134,9 @@ class Match:
 
         self.red_alliance_score  = int(json['alliances']['red']['score'])
         self.blue_alliance_score = int(json['alliances']['blue']['score'])
+
+        self.red_alliance_rp_awarded  = int(json['score_breakdown']['red']['rp'])
+        self.blue_alliance_rp_awarded = int(json['score_breakdown']['blue']['rp'])
 
         self.red_alliance_score_breakdown  = json['score_breakdown']['red']
         self.blue_alliance_score_breakdown = json['score_breakdown']['blue']
@@ -156,6 +162,7 @@ class Match:
             f"Match {self.comp_level} {self.match_number} of {self.event_id}:\n" +
             f"Blue Alliance: {b1}, {b2}, {b3} vs Red Alliance: {r1}, {r2}, {r3}\n" +
             f"Score: {self.blue_alliance_score} (Blue) - {self.red_alliance_score} (Red)\n" +
+            f"RP Awarded: {self.blue_alliance_rp_awarded} (Blue) - {self.red_alliance_rp_awarded} (Red)\n" +
             (f"Vidoe(s) of the match can be found here: {video_urls_str}" if len(video_urls_list) > 0 else "")
         )
 
