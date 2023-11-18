@@ -7,9 +7,10 @@ import logging
 import requests
 import datetime
 from typing import Optional
+from . import frc
 
 API_BASE_URL:         str  = 'https://www.thebluealliance.com/api/v3/'
-API_TOKEN_ENV_VAR:    str  = 'BLUE1_API_TOKEN'
+API_TOKEN_ENV_VAR:    str  = 'BLUE1_TBA_API_TOKEN'
 API_TOKEN:            str  = os.getenv(API_TOKEN_ENV_VAR)
 API_TOKEN_HEADER_KEY: str  = 'X-TBA-Auth-Key'
 API_HEADERS:          dict = { API_TOKEN_HEADER_KEY : API_TOKEN }
@@ -41,6 +42,57 @@ class Tba:
         res = self.make_api_request(path)
         return res.json() if res_is_good(res) else None
 
+
+    def get_team(self, team_number: int) -> Optional[frc.Team]:
+        """
+        Gets team info by their team number.
+        """
+        
+        data = self.get_team_json(team_number, simple=False)
+
+        if data is None:
+            return None
+
+        return frc.Team(data)
+
+
+    def get_match(self, match_id: str) -> Optional[frc.Match]:
+        """
+        Gets a match by its ID string (e.i. 2023cabl_qm1).
+        """
+
+        data = self.get_match_json(match_id, simple=False)
+
+        if data is None:
+            return None
+
+        return frc.Match(data)
+
+
+    def get_event(self, event_id: str) -> Optional[frc.Event]:
+        """
+        Gets an event by its ID string (e.i. 2023cabl).
+        """
+
+        data = self.get_event_json(event_id, simple=False)
+
+        if data is None:
+            return None
+
+        return frc.Event(data)
+    
+
+    def get_team_json(self, team_number: int, simple: bool = False) -> Optional[dict]:
+        """
+        Gets team info for the given team number.
+
+        Returns a JSON dictionary on success, `None` on failure.
+        """
+
+        path = f"team/frc{team_number}" + ("/simple" if simple else "")
+        res = self.make_api_request(path)
+        return res.json() if res_is_good(res) else None
+    
 
     def get_team_status_json(self, team_id: int, year: Optional[int] = None) -> Optional[dict]:
         """
@@ -91,7 +143,7 @@ class Tba:
         return res.json() if res_is_good(res) else None
     
 
-    def get_event_info_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
+    def get_event_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
         """
         Gets an event's information by its ID.
 
@@ -127,7 +179,7 @@ class Tba:
         return res.json() if res_is_good(res) else None
 
 
-    def get_event_matches(self, event_id: str, simple: bool = False) -> Optional[dict]:
+    def get_event_matches_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
         """
         Gets an event's matches by its ID.
 
@@ -135,6 +187,18 @@ class Tba:
         """
 
         path = f"event/{event_id}/matches" + ("/simple" if simple else "")
+        res = self.make_api_request(path)
+        return res.json() if res_is_good(res) else None
+    
+
+    def get_match_json(self, match_id: str, simple: bool = False) -> Optional[dict]:
+        """
+        Gets match data by its ID.
+
+        Returns a JSON dictionary on success, `None` on failure.
+        """
+
+        path = f"match/{match_id}" + ("/simple" if simple else "")
         res = self.make_api_request(path)
         return res.json() if res_is_good(res) else None
     
