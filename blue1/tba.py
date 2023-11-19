@@ -6,6 +6,7 @@ import os
 import logging
 import requests
 import datetime
+from functools import cmp_to_key
 from typing import Optional
 from . import frc
 
@@ -29,18 +30,6 @@ class Tba:
         """
         
         return self.get_api_status_json() is not None
-
-
-    def get_api_status_json(self) -> Optional[dict]:
-        """
-        Gets the status of the TBA API.
-
-        Returns a JSON dictionary on success, `None` on failure.
-        """
-
-        path = "status"
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
 
 
     def get_team(self, team_number: int) -> Optional[frc.Team]:
@@ -81,6 +70,39 @@ class Tba:
 
         return frc.Event(data)
     
+
+    def get_event_matches(self, event_id: str) -> [frc.Match]:
+        """
+        Gets a list of matches from the given event by its ID.
+        """
+
+        data_matches = self.get_event_matches_json(event_id)
+        matches: [frc.Match] = [frc.Match(m) for m in data_matches]
+        return sorted(matches, key=cmp_to_key(frc.match_cmp))
+
+
+    def get_team_matches(self, team_number: int, event_id: str) -> [frc.Match]:
+        """
+        Gets a list of matches that the given team played in for the given 
+        event by team number and event ID.
+        """
+
+        data_matches = self.get_team_matches_json(team_number, event_id=event_id)
+        matches: [frc.Match] = [frc.Match(m) for m in data_matches]
+        return matches
+    
+
+    def get_api_status_json(self) -> Optional[dict]:
+        """
+        Gets the status of the TBA API.
+
+        Returns a JSON dictionary on success, `None` on failure.
+        """
+
+        path = "status"
+        res = self.make_api_request(path)
+        return res.json() if res_is_good(res) else None
+
 
     def get_team_json(self, team_number: int, simple: bool = False) -> Optional[dict]:
         """
