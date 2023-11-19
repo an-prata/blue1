@@ -6,9 +6,11 @@ import discord
 import logging
 import json
 import os
+import math
 from time import sleep
 from datetime import datetime
-from functools import cmp_to_key
+from collections import OrderedDict
+from functools import cmp_to_key, reduce
 from matplotlib import pyplot
 from discord.ext import commands
 from . import tba
@@ -48,6 +50,108 @@ class Blue1:
         async def get_event(ctx, event_id):
             event = self.tba.get_event(event_id)
             await ctx.send(event.pretty_print())
+
+
+        @self.bot.command()
+        async def get_team_rank(ctx, team_number, event_id):
+            team_number = int(team_number)
+            teams = self.tba.get_event_teams(event_id)
+            matches = sorted(
+                self.tba.get_event_matches(event_id),
+                key=cmp_to_key(frc.match_cmp)
+            )
+
+            # team : (rank points, matches played)
+            team_ranks: {int : (int, int)} = OrderedDict({t: (0, 0) for t in teams})
+            rp_avg_v_time: [int] = []
+            rank_v_time: [int] = []
+
+            for match in matches:
+                if match.comp_level != 'qm':
+                    continue
+                
+                for team in match.red_alliance_teams:
+                    rp = team_ranks[team][0] + match.red_alliance_rp_awarded
+                    matches = team_ranks[team][1] + 1
+                    team_ranks[team] = (rp, matches)
+
+                for team in match.blue_alliance_teams:
+                    rp = team_ranks[team][0] + match.blue_alliance_rp_awarded
+                    matches = team_ranks[team][1] + 1
+                    team_ranks[team] = (rp, matches)
+
+                team_ranks = OrderedDict(sorted(
+                    team_ranks.items(),
+                    key=lambda rank: (
+                        float(rank[1][0]) / float(rank[1][1]) if rank[1][1] != 0 else 0
+                    )
+                ))
+
+                rank = team_ranks[team_number]
+                rp_avg_v_time.append(float(rank[0]) / float(rank[1]) if rank[1] != 0 else 0)
+
+                curr_rank: int = 1
+
+                for team, rank in team_ranks.items():
+                    team_r = float(rank[0]) / float(rank[1]) if rank[1] != 0 else 0
+
+                    if team_r > rp_avg_v_time[-1]:
+                        curr_rank += 1
+                    
+                # negate to display lesser value ranks higher
+                rank_v_time.append(curr_rank)
+
+            while self.plotting:
+                sleep(0.25)
+
+            # deny plotting to other async calls to this method
+            self.plotting = True
+
+            file1_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
+            
+            pyplot.plot(range(1, len(rank_v_time) + 1), rank_v_time, linewidth=2, color='blue')
+            pyplot.xlabel('qualifying match number')
+            pyplot.ylabel(f"team {team_number}'s rank")
+            pyplot.xticks(range(0, len(rank_v_time), 10))
+
+            _, upper = pyplot.ylim()
+            pyplot.ylim(upper, 0)
+
+            pyplot.savefig(file1_name)
+            pyplot.clf()
+
+            file2_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
+            
+            pyplot.plot(range(1, len(rp_avg_v_time) + 1), rp_avg_v_time, linewidth=2, color='blue')
+            pyplot.xlabel('qualifying match number')
+            pyplot.ylabel(f"team {team_number}'s average RP award")
+            pyplot.xticks(range(0, len(rp_avg_v_time), 10))
+
+            _, upper = pyplot.ylim()
+            pyplot.ylim(0, upper)
+
+            pyplot.savefig(file2_name)
+            pyplot.clf()
+
+            # allow plotting by other async calls of this metho
+            self.plotting = False
+
+            await ctx.send("", file=discord.File(file1_name))
+            await ctx.send("", file=discord.File(file2_name))
+            os.remove(file1_name)
+            os.remove(file2_name)
+
+
+        @self.bot.command()
+        async def get_event_rankings(ctx, event_id):
+            rankings = self.tba.get_event_rankings(event_id)
+            message = "Rank:\tTeam Number"
+
+            for r, t in rankings:
+                pad = ' ' * (3 - int(math.log10(r)))
+                message = f"{message}\n{pad}{r}:\t{t}"
+
+            await ctx.send(f"```\n{message}\n```")
 
 
         @self.bot.command()
