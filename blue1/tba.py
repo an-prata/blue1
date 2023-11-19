@@ -45,6 +45,17 @@ class Tba:
         return frc.Team(data)
 
 
+    def get_team_matches(self, team_number: int, event_id: str) -> [frc.Match]:
+        """
+        Gets a list of matches that the given team played in for the given 
+        event by team number and event ID.
+        """
+
+        data_matches = self.get_team_matches_json(team_number, event_id=event_id)
+        matches: [frc.Match] = [frc.Match(m) for m in data_matches]
+        return matches
+    
+
     def get_match(self, match_id: str) -> Optional[frc.Match]:
         """
         Gets a match by its ID string (e.i. 2023cabl_qm1).
@@ -80,18 +91,32 @@ class Tba:
         matches: [frc.Match] = [frc.Match(m) for m in data_matches]
         return sorted(matches, key=cmp_to_key(frc.match_cmp))
 
-
-    def get_team_matches(self, team_number: int, event_id: str) -> [frc.Match]:
+    def get_event_rankings(self, event_id: str) -> [(int, int)]:
         """
-        Gets a list of matches that the given team played in for the given 
-        event by team number and event ID.
+        Gets the current team rankings for the given event by its ID.
+
+        Returns a list who's elements are two-tuples, the first item being a
+        rank, the second being a team number.
         """
 
-        data_matches = self.get_team_matches_json(team_number, event_id=event_id)
-        matches: [frc.Match] = [frc.Match(m) for m in data_matches]
-        return matches
+        data = self.get_event_rankings_json(event_id)
+        rankings: [(int, int)] = sorted(
+            [(r['rank'], frc.team_number_from_id(r['team_key'])) for r in data['rankings']],
+            key=lambda r: r[0]
+        )
+        return rankings
+
+
+    def get_event_teams(self, event_id: str) -> [int]:
+        """
+        Gets an event's teams.
+        """
+
+        data = self.get_event_teams_json(event_id, simple=True)
+        teams: [int] = [team['team_number'] for team in data]
+        return teams
     
-
+    
     def get_api_status_json(self) -> Optional[dict]:
         """
         Gets the status of the TBA API.
