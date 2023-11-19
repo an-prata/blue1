@@ -3,18 +3,18 @@
 # See LICENSE file at repository root for details.
 
 import discord
-import logging
 import json
-import os
+import logging
 import math
-from time import sleep
-from datetime import datetime
+import os
 from collections import OrderedDict
+from datetime import datetime
+from discord.ext import commands
 from functools import cmp_to_key, reduce
 from matplotlib import pyplot
-from discord.ext import commands
-from . import tba
+from time import sleep
 from . import frc
+from . import tba
 
 API_TOKEN_ENV_VAR = 'BLUE1_DISCORD_API_TOKEN'
 API_TOKEN: str = os.getenv(API_TOKEN_ENV_VAR)

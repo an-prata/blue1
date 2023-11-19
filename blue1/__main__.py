@@ -2,8 +2,8 @@
 # Licensed under the MIT License
 # See LICENSE file at repository root for details.
 
-import json
 import asyncio
+import json
 from . import bot
 from . import tba
 

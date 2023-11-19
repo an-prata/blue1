@@ -2,10 +2,10 @@
 # Licensed under the MIT License
 # See LICENSE file at repository root for details.
 
-import os
-import logging
-import requests
 import datetime
+import logging
+import os
+import requests
 from functools import cmp_to_key
 from typing import Optional
 from . import frc
