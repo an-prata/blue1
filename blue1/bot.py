@@ -117,22 +117,24 @@ class Blue1:
                 sleep(0.25)
 
             # deny plotting to other async calls to this method
-            plotting = True
+            self.plotting = True
 
             file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
             
-            pyplot.plot(team_scores, linewidth=4)
+            pyplot.plot(team_scores, linewidth=2, color='blue')
+            pyplot.plot(team_scores, 'o', color='blue')
             pyplot.xlabel('matches played')
             pyplot.ylabel(f"team {team_number}'s score")
+            pyplot.xticks(range(1, len(team_scores) + 1))
 
             _, upper = pyplot.ylim()
             pyplot.ylim(0, upper)
-            
+
             pyplot.savefig(file_name)
             pyplot.clf()
 
-            # allow plotting by other async calls of this method
-            plotting = False
+            # allow plotting by other async calls of this metho
+            self.plotting = False
             
             for m in message:
                 await ctx.send(m)
@@ -156,21 +158,40 @@ class Blue1:
                 key=cmp_to_key(frc.match_cmp)
             )
 
-            team1_scores: [float] = [m.get_team_score(team1_number) for m in team1_matches if m.was_played()]
-            team2_scores: [float] = [m.get_team_score(team2_number) for m in team2_matches if m.was_played()]
+            event_matches = sorted(
+                self.tba.get_event_matches(event_id),
+                key=cmp_to_key(frc.match_cmp)
+            )
+
+            qualifiers: [Match] = [m for m in event_matches if 'qm' in m.comp_level]
+            semifinals: [Match] = [m for m in event_matches if 'sf' in m.comp_level]
+            team1_scores: [int] = [m.get_team_score(team1_number) for m in team1_matches if m.was_played()]
+            team2_scores: [int] = [m.get_team_score(team2_number) for m in team2_matches if m.was_played()]
+
+            scale = lambda m: (
+                m.overall_number() + 
+                (qualifiers[-1].overall_number() if 'qm' not in m.comp_level else 0) +
+                (semifinals[-1].overall_number() if 'sf' not in m.comp_level and 'qm' not in m.comp_level else 0)
+            )
+            
+            team1_match_numbers: [int] = [scale(m) for m in team1_matches if m.was_played()]
+            team2_match_numbers: [int] = [scale(m) for m in team2_matches if m.was_played()]
 
             while self.plotting:
                 sleep(0.25)
 
             # deny plotting to other async calls to this method
-            plotting = True
+            self.plotting = True
 
             file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
             
-            pyplot.plot(team1_scores, linewidth=4, color='blue')
-            pyplot.plot(team2_scores, linewidth=4, color='red')
-            pyplot.xlabel('matches played')
+            pyplot.plot(team1_match_numbers, team1_scores, linewidth=2, color='blue')
+            pyplot.plot(team1_match_numbers, team1_scores, 'o', color='blue',)
+            pyplot.plot(team2_match_numbers, team2_scores, linewidth=2, color='red')
+            pyplot.plot(team2_match_numbers, team2_scores, 'o', color='red',)
+            pyplot.xlabel('match number')
             pyplot.ylabel(f"scores (team one in red, two in blue)")
+            pyplot.xticks(range(0, len(event_matches) + 1, 10))
 
             _, upper = pyplot.ylim()
             pyplot.ylim(0, upper)
@@ -179,7 +200,7 @@ class Blue1:
             pyplot.clf()
 
             # allow plotting by other async calls of this method
-            plotting = False
+            self.plotting = False
                 
             await ctx.send("", file=discord.File(file_name))
             os.remove(file_name)
