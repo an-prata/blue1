@@ -6,17 +6,23 @@ import discord
 import logging
 import json
 import os
+from time import sleep
+from datetime import datetime
+from functools import cmp_to_key
 from matplotlib import pyplot
 from discord.ext import commands
 from . import tba
+from . import frc
 
 API_TOKEN_ENV_VAR = 'BLUE1_DISCORD_API_TOKEN'
 API_TOKEN: str = os.getenv(API_TOKEN_ENV_VAR)
+DISCORD_MAX_MESSAGE = 2000
 
 class Blue1:
-    bot:   commands.Bot
-    token: str
-    tba:   tba.Tba
+    bot:      commands.Bot
+    token:    str
+    tba:      tba.Tba
+    plotting: bool = False
 
     def __init__(self, token: str, tba: tba.Tba):
         intents = discord.Intents.default()
@@ -42,70 +48,141 @@ class Blue1:
         async def get_event(ctx, event_id):
             event = self.tba.get_event(event_id)
             await ctx.send(event.pretty_print())
+
+
+        @self.bot.command()
+        async def get_event_matches(ctx, event_id):
+            matches = sorted(
+                self.tba.get_event_matches(event_id),
+                key=cmp_to_key(frc.match_cmp)
+            )
+
+            message = [""]
+            message_i = 0
+
+            for match in matches:
+                if not match.was_played():
+                    continue
+                
+                this_match = f"{match.human_readable_name()}"
+                tmp = f"{message[message_i]}\n{this_match}"
+
+                if len(tmp) >= DISCORD_MAX_MESSAGE:
+                    message_i += 1
+                    message.append(this_match)
+                else:
+                    message[message_i] = tmp
+
+
+            for msg in message:
+                await ctx.send(msg)
         
 
         @self.bot.command()
-        async def get_team_event(ctx, team, event):
-            team = int(team)
-            matches = self.tba.get_team_matches_json(team, event_id=event)
+        async def get_team_event(ctx, team_number, event_id):
+            team_number = int(team_number)
+            matches = sorted(
+                self.tba.get_team_matches(
+                    team_number, 
+                    event_id=event_id
+                ), 
+                key=cmp_to_key(frc.match_cmp)
+            )
 
-            if matches is None:
-                await ctx.send(f"could not get data on {team} for event")
+            if len(matches) < 1:
+                await ctx.send(f"no matched for {team} at {event_id}")
                 return
 
-
-            def match_index(match) -> int:
-                index = int(match['match_number'])
-
-                if match['comp_level'] == 'sf':
-                    index += 250
-                elif match['comp_level'] == 'f':
-                    index += 300
-
-                return index
-            
-
             team_scores: [float] = []
-            opponent_scores: [float] = []
 
-            matches_in_msg = 0
-            msg = ""
+            message = [""]
+            message_i = 0
 
-            for match in sorted(matches, key=match_index):
-                number = match['match_number']
-                level = match['comp_level']
-                red_alliance = match['alliances']['red']['team_keys']
-                red_score = match['alliances']['red']['score']
-                blue_alliance = match['alliances']['blue']['team_keys']
-                blue_score = match['alliances']['blue']['score']
-                msg = f"""{msg}
-**Match {level} {number}**:
-*:blue_circle: Blue Alliance*: {blue_alliance}
-*:blue_circle: Blue Alliance Score*: {blue_score}
-*:red_circle: Red Alliance*: {red_alliance}
-*:red_circle: Red Alliance Score*: {red_score}
-                """
-                matches_in_msg += 1
+            for match in matches:
+                if not match.was_played():
+                    continue
+                
+                this_match = f"{match.pretty_print()}"
+                tmp = f"{message[message_i]}\n{this_match}"
 
-                if matches_in_msg >= 4:
-                    await ctx.send(msg)
-                    msg = ""
-                    matches_in_msg = 0
-
-                if f"frc{team}" in red_alliance:
-                    team_scores.append(float(red_score))
-                    opponent_scores.append(float(blue_score))
+                if len(tmp) >= DISCORD_MAX_MESSAGE:
+                    message_i += 1
+                    message.append(this_match)
                 else:
-                    team_scores.append(float(blue_score))
-                    opponent_scores.append(float(red_score))
+                    message[message_i] = tmp
+
+                team_scores.append(match.get_team_score(team_number))
             
-            pyplot.plot(team_scores, linewidth=6)
+            while self.plotting:
+                sleep(0.25)
+
+            # deny plotting to other async calls to this method
+            plotting = True
+
+            file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
+            
+            pyplot.plot(team_scores, linewidth=4)
             pyplot.xlabel('matches played')
-            pyplot.ylabel(f"team {team}'s score")
-            pyplot.savefig('temp.png')
+            pyplot.ylabel(f"team {team_number}'s score")
+
+            _, upper = pyplot.ylim()
+            pyplot.ylim(0, upper)
             
-            await ctx.send("", file=discord.File('temp.png'))
-            os.remove('temp.png')
+            pyplot.savefig(file_name)
+            pyplot.clf()
+
+            # allow plotting by other async calls of this method
+            plotting = False
+            
+            for m in message:
+                await ctx.send(m)
+                
+            await ctx.send("", file=discord.File(file_name))
+            os.remove(file_name)
+
+
+        @self.bot.command()
+        async def compare_teams_event(ctx, team1_number, team2_number, event_id):
+            team1_number = int(team1_number)
+            team2_number = int(team2_number)
+
+            team1_matches = sorted(
+                self.tba.get_team_matches(team1_number, event_id),
+                key=cmp_to_key(frc.match_cmp)
+            )
+
+            team2_matches = sorted(
+                self.tba.get_team_matches(team2_number, event_id),
+                key=cmp_to_key(frc.match_cmp)
+            )
+
+            team1_scores: [float] = [m.get_team_score(team1_number) for m in team1_matches if m.was_played()]
+            team2_scores: [float] = [m.get_team_score(team2_number) for m in team2_matches if m.was_played()]
+
+            while self.plotting:
+                sleep(0.25)
+
+            # deny plotting to other async calls to this method
+            plotting = True
+
+            file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
+            
+            pyplot.plot(team1_scores, linewidth=4, color='blue')
+            pyplot.plot(team2_scores, linewidth=4, color='red')
+            pyplot.xlabel('matches played')
+            pyplot.ylabel(f"scores (team one in red, two in blue)")
+
+            _, upper = pyplot.ylim()
+            pyplot.ylim(0, upper)
+            
+            pyplot.savefig(file_name)
+            pyplot.clf()
+
+            # allow plotting by other async calls of this method
+            plotting = False
+                
+            await ctx.send("", file=discord.File(file_name))
+            os.remove(file_name)
             
 
     async def start(self):
