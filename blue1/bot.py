@@ -93,7 +93,7 @@ class Blue1:
                 await ctx.send(f"no matched for {team} at {event_id}")
                 return
 
-            team_scores: [float] = []
+            team_scores: [int] = []
 
             message = [""]
             message_i = 0
@@ -121,8 +121,8 @@ class Blue1:
 
             file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
             
-            pyplot.plot(team_scores, linewidth=2, color='blue')
-            pyplot.plot(team_scores, 'o', color='blue')
+            pyplot.plot(range(1, len(team_scores) + 1), team_scores, linewidth=2, color='blue')
+            pyplot.plot(range(1, len(team_scores) + 1), team_scores, 'o', color='blue')
             pyplot.xlabel('matches played')
             pyplot.ylabel(f"team {team_number}'s score")
             pyplot.xticks(range(1, len(team_scores) + 1))
