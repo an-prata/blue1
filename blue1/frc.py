@@ -44,28 +44,33 @@ class Team:
 
 
 def team_number_from_id(id: str) -> int:
+    """
+    Given a team ID for TBA in the format 'frc[team_number]', returns the team's
+    number.
+    """
+
     return int(id.removeprefix('frc'))
 
 
 class Event:
-    id:         Optional[str]
-    name:       Optional[str]
-    event_code: Optional[str]
-    event_type: Optional[str]
-    website:    Optional[str]
+    id:         Optional[str] = None
+    name:       Optional[str] = None
+    event_code: Optional[str] = None
+    event_type: Optional[str] = None
+    website:    Optional[str] = None
 
-    playoff_type: Optional[str]
+    playoff_type: Optional[str] = None
 
-    country:           Optional[str]
-    state_or_province: Optional[str]
-    city:              Optional[str]
-    address:           Optional[str]
-    location_name:     Optional[str]
-    gmaps_url:         Optional[str]
+    country:           Optional[str] = None
+    state_or_province: Optional[str] = None
+    city:              Optional[str] = None
+    address:           Optional[str] = None
+    location_name:     Optional[str] = None
+    gmaps_url:         Optional[str] = None
 
-    start_date: Optional[str]
-    end_date:   Optional[str]
-    year:       Optional[int]
+    start_date: Optional[str] = None
+    end_date:   Optional[str] = None
+    year:       Optional[int] = None
 
 
     def __init__(self, json: dict):
@@ -99,27 +104,27 @@ class Event:
 
 
 class Match:
-    id:           Optional[str]
-    event_id:     Optional[str]
-    comp_level:   Optional[str]
-    set_number:   Optional[int]
-    match_number: Optional[int]
+    id:           Optional[str] = None
+    event_id:     Optional[str] = None
+    comp_level:   Optional[str] = None
+    set_number:   Optional[int] = None
+    match_number: Optional[int] = None
 
-    red_alliance_teams:  [int]
-    blue_alliance_teams: [int]
+    red_alliance_teams:  [int] = []
+    blue_alliance_teams: [int] = []
 
-    red_alliance_score:  Optional[int]
-    blue_alliance_score: Optional[int]
+    red_alliance_score:  Optional[int] = None
+    blue_alliance_score: Optional[int] = None
 
-    red_alliance_rp_awarded:  Optional[int]
-    blue_alliance_rp_awarded: Optional[int]
+    red_alliance_rp_awarded:  Optional[int] = None
+    blue_alliance_rp_awarded: Optional[int] = None
 
-    red_alliance_score_breakdown:  Optional[dict]
-    blue_alliance_score_breakdown: Optional[dict]
+    red_alliance_score_breakdown:  Optional[dict] = None
+    blue_alliance_score_breakdown: Optional[dict] = None
 
-    winning_alliance: Optional[str]
+    winning_alliance: Optional[str] = None
 
-    videos: Optional[dict]
+    videos: Optional[dict] = None
     
 
     def __init__(self, json: dict):
@@ -135,16 +140,65 @@ class Match:
         self.red_alliance_score  = int(json['alliances']['red']['score'])
         self.blue_alliance_score = int(json['alliances']['blue']['score'])
 
-        self.red_alliance_rp_awarded  = int(json['score_breakdown']['red']['rp'])
-        self.blue_alliance_rp_awarded = int(json['score_breakdown']['blue']['rp'])
+        if self.red_alliance_score < 0 and self.blue_alliance_score < 0:
+            self.red_alliance_score = None
+            self.blue_alliance_score = None
 
-        self.red_alliance_score_breakdown  = json['score_breakdown']['red']
-        self.blue_alliance_score_breakdown = json['score_breakdown']['blue']
+        try:
+            self.red_alliance_rp_awarded  = int(json['score_breakdown']['red']['rp'])
+            self.blue_alliance_rp_awarded = int(json['score_breakdown']['blue']['rp'])
+
+            self.red_alliance_score_breakdown  = json['score_breakdown']['red']
+            self.blue_alliance_score_breakdown = json['score_breakdown']['blue']
+        except TypeError:
+            # Catching exception if the score breakdown is `NoneType`
+            pass
 
         self.winning_alliance = json['winning_alliance']
 
         self.videos = json['videos']
 
+
+    def was_played(self) -> bool:
+        """
+        Returns `True` if the match was played. Its rare that this is false, the
+        most notable positive result is if a finals round is won in two matches.
+        """
+
+        return self.blue_alliance_score is not None and self.red_alliance_score is not None
+
+
+    def get_team_score(self, team_number: int) -> Optional[int]:
+        """
+        Gets the score of the given team's alliance, or `None` if they were not
+        in the `Match`.
+        """
+
+        if team_number in self.red_alliance_teams:
+            return self.red_alliance_score
+
+        if team_number in self.blue_alliance_teams:
+            return self.blue_alliance_score
+
+        return None
+
+    
+    def human_readable_name(self) -> str:
+        """
+        Returns a string with a more human friendly way to identify a match.
+        """
+        return f"Match {self.comp_level} {self.match_number} (set {self.set_number}) ({self.id})"
+
+
+    def overall_number(self) -> int:
+        """
+        Gives match number times the set number, this makes finals 3 have an
+        overall number of 3 rather than its match number of 1, while quals still
+        have an overall number equal to their match numver.
+        """
+        
+        return self.set_number * self.match_number
+    
 
     def pretty_print(self) -> str:
         r1 = self.red_alliance_teams[0]
@@ -159,10 +213,48 @@ class Match:
         video_urls_str = functools.reduce(lambda acc, i: f"{acc}, {i}", video_urls_list, '')
 
         return (
-            f"Match {self.comp_level} {self.match_number} of {self.event_id}:\n" +
+            f"{self.human_readable_name()} of {self.event_id}:\n" +
             f"Blue Alliance: {b1}, {b2}, {b3} vs Red Alliance: {r1}, {r2}, {r3}\n" +
             f"Score: {self.blue_alliance_score} (Blue) - {self.red_alliance_score} (Red)\n" +
             f"RP Awarded: {self.blue_alliance_rp_awarded} (Blue) - {self.red_alliance_rp_awarded} (Red)\n" +
-            (f"Vidoe(s) of the match can be found here: {video_urls_str}" if len(video_urls_list) > 0 else "")
+            (f"Vidoe(s) of the match can be found here: {video_urls_str}\n" if len(video_urls_list) > 0 else "")
         )
 
+
+def comp_level_cmp(x: str, y: str) -> int:
+    """
+    Comparison method for competition levels in matches. Later in the comp is
+    considered "greater".
+    """
+
+    if x == y:
+        return 0
+    elif x == 'f':
+        return 1
+    elif y == 'f':
+        return -1
+    elif x == 'sf':
+        return 1
+    elif y == 'sf':
+        return -1
+
+
+def match_cmp(x: Match, y: Match) -> int:
+    """
+    Comparison method for `Match`s. `Match`s that were scheduled for later are
+    considered "greater" matches.
+    """
+
+    if not x.was_played():
+        return -1
+    elif not y.was_played():
+        return 1
+    
+    level_cmp = comp_level_cmp(x.comp_level, y.comp_level)
+
+    if level_cmp != 0:
+        return level_cmp
+
+    return x.overall_number() - y.overall_number()
+
+    
