@@ -14,8 +14,8 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 CREDENTIALS_PATH = 'credentials.json'
 TOKEN_PATH = 'token.json'
 
-SHEET_MAX_COLUM = 'ZZ'
-SHEET_MAX_ROW = '1024'
+sheet_max_column = 26
+sheet_max_row = 100
 
 SHEET_BOUNDS_X_CELL = 'A1'
 SHEET_BOUNDS_Y_CELL = 'B1'
@@ -137,7 +137,7 @@ class Spreadsheet:
 
     def get_sheet_bounds(self, sheet_name: str) -> (int, int):
         """
-        Get a (length, width) two-tuple for the bounds of a spread sheet. This 
+        Get a (rows, columns) two-tuple for the bounds of a spread sheet. This 
         function assumes that the spreadsheet's data begins at the cell `A1`, and
         that at least the cells in column `A` and in row `1` are populated 
         entirely.
@@ -146,9 +146,12 @@ class Spreadsheet:
         use the Google Sheets API.
         """
 
+        global sheet_max_column
+        global sheet_max_row
+
         origin = f"{sheet_name}!A1"
-        right_bound = f"{sheet_name}!{SHEET_MAX_COLUM}1"
-        lower_bound = f"{sheet_name}!A{SHEET_MAX_ROW}"
+        right_bound = f"{sheet_name}!{column_num_to_alpha(sheet_max_column)}1"
+        lower_bound = f"{sheet_name}!A{sheet_max_row}"
         countersheet = get_blue1_countersheet(sheet_name)
 
         try:
@@ -172,7 +175,16 @@ class Spreadsheet:
         )
 
         data = self.get_cells(f"{countersheet}!{SHEET_BOUNDS_RANGE}")
-        return (data[0][0], data[0][1])
+
+        if int(data[0][0]) == sheet_max_row:
+            sheet_max_row *= 2
+            return self.get_sheet_bounds(sheet_name)
+
+        if int(data[0][1]) == sheet_max_column:
+            sheet_max_column *= 2
+            return self.get_sheet_bounds(sheet_name)
+        
+        return (int(data[0][0]), int(data[0][1]))
 
 
     def get_row_dict(self, row: int, sheet_name: str, sheet_bounds: (int, int)) -> dict:
@@ -227,6 +239,7 @@ def column_num_to_alpha(num: int) -> str:
     
     A = 65
 
+    num -= 1
     last = num % 26
 
     if last == num:
