@@ -1,2 +1,4 @@
 blue1/__pycache__
 venv/*
+credentials.json
+token.json
