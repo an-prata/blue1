@@ -3,12 +3,14 @@
 # See LICENSE file at repository root for details.
 
 import datetime
+import time
 import logging
 import os
 import requests
 from functools import cmp_to_key
 from typing import Optional
 from . import frc
+from . import state
 
 API_BASE_URL:         str  = 'https://www.thebluealliance.com/api/v3/'
 API_TOKEN_ENV_VAR:    str  = 'BLUE1_TBA_API_TOKEN'
@@ -18,6 +20,8 @@ API_HEADERS:          dict = { API_TOKEN_HEADER_KEY : API_TOKEN }
 
 class Tba:
     token: str
+    cache_hits: int = 0
+    cache_misses: int = 0
 
 
     def __init__(self, token: str):
@@ -125,8 +129,7 @@ class Tba:
         """
 
         path = "status"
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_team_json(self, team_number: int, simple: bool = False) -> Optional[dict]:
@@ -137,8 +140,7 @@ class Tba:
         """
 
         path = f"team/frc{team_number}" + ("/simple" if simple else "")
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
     
 
     def get_team_status_json(self, team_id: int, year: Optional[int] = None) -> Optional[dict]:
@@ -150,8 +152,7 @@ class Tba:
 
         year = datetime.date.today().year if year is None else year
         path = f"team/frc{team_id}/events/{year}/statuses"
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_team_matches_json(self, 
@@ -174,8 +175,7 @@ class Tba:
             + (f"/event/{event_id}/matches" if event_id is not None else f"/matches/{year}")
             + (f"/simple" if simple else "")
         )
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_team_event_status_json(self, team_id: int, event_id: str) -> Optional[dict]:
@@ -186,8 +186,7 @@ class Tba:
         """
 
         path = f"team/frc{team_id}/event/{event_id}/status"
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
     
 
     def get_event_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
@@ -198,8 +197,7 @@ class Tba:
         """
 
         path = f"event/{event_id}" + ("/simple" if simple else "")
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_event_rankings_json(self, event_id: str) -> Optional[dict]:
@@ -210,8 +208,7 @@ class Tba:
         """
 
         path = f"event/{event_id}/rankings"
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_event_teams_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
@@ -222,8 +219,7 @@ class Tba:
         """
 
         path = f"event/{event_id}/teams" + ("/simple" if simple else "")
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
 
 
     def get_event_matches_json(self, event_id: str, simple: bool = False) -> Optional[dict]:
@@ -234,8 +230,7 @@ class Tba:
         """
 
         path = f"event/{event_id}/matches" + ("/simple" if simple else "")
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
     
 
     def get_match_json(self, match_id: str, simple: bool = False) -> Optional[dict]:
@@ -246,11 +241,10 @@ class Tba:
         """
 
         path = f"match/{match_id}" + ("/simple" if simple else "")
-        res = self.make_api_request(path)
-        return res.json() if res_is_good(res) else None
+        return self.make_api_request(path)
     
 
-    def make_api_request(self, path: str) -> requests.Response:
+    def make_api_request(self, path: str) -> dict:
         """
         Make an API request to the given path for TBA, using this instance's
         token.
@@ -259,10 +253,31 @@ class Tba:
         internals.
         """
         
+        cache_expiration_time = state.STATE.get('cache_expiration_time')
         headers = { API_TOKEN_HEADER_KEY : self.token}
         url = API_BASE_URL + path
-        logging.info(f"making request for '{url}'")
-        return requests.get(url, headers=headers)
+
+        if cache_expiration_time is None:
+            return requests.get(url, headers=headers)
+        
+        cache_item: (int, requests.Response) = state.CACHE.get(path)
+
+        if cache_item is None or round(time.time()) - cache_item['time'] > cache_expiration_time:
+            self.cache_misses += 1
+
+            response = requests.get(url, headers=headers)
+            data = response.json() if res_is_good(response) else None
+
+            value = {
+                'time': round(time.time()),
+                'response': data
+            }
+
+            state.CACHE.set(path, value)
+            return data
+
+        self.cache_hits += 1
+        return cache_item['response']
 
 
 def tba_from_env() -> Tba:
