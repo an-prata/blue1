@@ -258,7 +258,7 @@ class Tba:
         url = API_BASE_URL + path
 
         if cache_expiration_time is None:
-            return requests.get(url, headers=headers)
+            return requests.get(url, headers=headers).json()
         
         cache_item: (int, requests.Response) = state.CACHE.get(path)
 
