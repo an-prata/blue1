@@ -22,6 +22,9 @@ SHEET_BOUNDS_Y_CELL = 'B1'
 SHEET_BOUNDS_RANGE = f"{SHEET_BOUNDS_X_CELL}:{SHEET_BOUNDS_Y_CELL}"
 
 
+DEFAULT_SHEET_NAME = 'Sheet1'
+
+
 class ValueInputOption(StrEnum):
     RAW = 'RAW'
     USER_ENTERED = 'USER_ENTERED'
@@ -136,7 +139,7 @@ class Spreadsheet:
         )['values']
 
 
-    def get_sheet_bounds(self, sheet_name: str) -> (int, int):
+    def get_sheet_bounds(self, sheet_name: str = DEFAULT_SHEET_NAME) -> (int, int):
         """
         Get a (rows, columns) two-tuple for the bounds of a spread sheet. This 
         function assumes that the spreadsheet's data begins at the cell `A1`, and
@@ -188,7 +191,27 @@ class Spreadsheet:
         return (int(data[0][0]), int(data[0][1]))
 
 
-    def get_row_dict(self, row: int, sheet_name: str, sheet_bounds: (int, int)) -> dict:
+    def get_fields(self, sheet_bounds: (int, int), sheet_name: str = DEFAULT_SHEET_NAME) -> [str]:
+        """
+        Gets the fields associated with this spreadsheet. This method assumes
+        that the sheet is set up so that the first row has field names for the 
+        rows below.
+        
+        This method may throw an exception on faulty parameters or failure to
+        use the Google Sheets API.
+        """
+
+        _, columns = sheet_bounds
+        columns = int(columns)
+        fields = self.get_cells(f"{sheet_name}!A1:{column_num_to_alpha(columns)}1")[0]
+        return fields
+
+    
+    def get_row_dict(self, 
+                     row: int, 
+                     sheet_bounds: (int, int), 
+                     sheet_name: str = DEFAULT_SHEET_NAME
+                     ) -> dict:
         """
         Gets a row of the sheet using the top row as keys to the values from the
         given row. This method assums that the sheet is set up with the top row
@@ -209,7 +232,11 @@ class Spreadsheet:
         return dict(zip(keys, values))
 
 
-    def get_column_list(self, column: str, sheet_name: str, sheet_bounds: (int, int)) -> [str]:
+    def get_column_list(self, 
+                        column: str, 
+                        sheet_bounds: (int, int), 
+                        sheet_name: str = DEFAULT_SHEET_NAME
+                        ) -> [str]:
         """
         Returns a list of all values in the given column on the given sheet.
         This method assumes that the first row is for labels of each column and
