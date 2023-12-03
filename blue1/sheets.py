@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
+from . import logging
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 CREDENTIALS_PATH = 'credentials.json'
@@ -287,19 +288,37 @@ def produce_valid_credentials() -> Credentials:
 
     credentials: Credentials = None
 
+    logging.log("SHEETS", f"Producing credentials ...")
+
     if os.path.exists(TOKEN_PATH):
+        logging.log("SHEETS", f"Using {TOKEN_PATH} for credentials")
         credentials = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     
     if not credentials or not credentials.valid:
         if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
+            #logging.log("SHEETS", "Credentials expired, refreshing token ...")
+            #credentials.refresh(Request())
+            #logging.log("SHEETS", "Refreshed token")
+
+            # Above is the official way to refresh creds, but for whatever 
+            # reason it doesn't work, at least not on my laptop, so for now we 
+            # will default producing new credentials.
+
+            logging.log("SHEETS", f"Using client {CREDENTIALS_PATH} to produce credentials ...")
+            flow = InstalledAppFlow.from_client_secrets_file(
+                CREDENTIALS_PATH, SCOPES
+            )
+            credentials = flow.run_local_server(port=0)
+
         else:
+            logging.log("SHEETS", f"Using client {CREDENTIALS_PATH} to produce credentials ...")
             flow = InstalledAppFlow.from_client_secrets_file(
                 CREDENTIALS_PATH, SCOPES
             )
             credentials = flow.run_local_server(port=0)
 
         with open(TOKEN_PATH, 'w') as token_file:
+            logging.log("SHEETS", f"Saving new credentials to {TOKEN_PATH}")
             token_file.write(credentials.to_json())
 
     return credentials

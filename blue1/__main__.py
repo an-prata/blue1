@@ -3,7 +3,6 @@
 # See LICENSE file at repository root for details.
 
 import asyncio
-import json
 from . import bot
 from . import tba
 

@@ -4,13 +4,13 @@
 
 import datetime
 import time
-import logging
 import os
 import requests
 from functools import cmp_to_key
 from typing import Optional
 from . import frc
 from . import state
+from . import logging
 
 API_BASE_URL:         str  = 'https://www.thebluealliance.com/api/v3/'
 API_TOKEN_ENV_VAR:    str  = 'BLUE1_TBA_API_TOKEN'
@@ -258,11 +258,17 @@ class Tba:
         url = API_BASE_URL + path
 
         if cache_expiration_time is None:
+            logging.log("TBA", f"Requesting '{path}' (cache disabled)")
             return requests.get(url, headers=headers).json()
         
         cache_item: (int, requests.Response) = state.CACHE.get(path)
 
         if cache_item is None or round(time.time()) - cache_item['time'] > cache_expiration_time:
+            if cache_item is None:
+                logging.log("TBA", f"Cache miss for '{path}'")
+            else:
+                logging.log("TBA", f"Cache expiration for '{path}'")
+            
             self.cache_misses += 1
 
             response = requests.get(url, headers=headers)
@@ -276,6 +282,7 @@ class Tba:
             state.CACHE.set(path, value)
             return data
 
+        logging.log("TBA", f"Cache hit for '{path}'")
         self.cache_hits += 1
         return cache_item['response']
 
@@ -287,10 +294,13 @@ def tba_from_env() -> Tba:
     and exits the program.
     """
 
+    logging.log("TBA", "Getting TBA key from enviornment ...")
+
     if API_TOKEN is None:
-        logging.critical(f"{API_TOKEN_ENV_VAR} enviornment variable not present")
+        logging.err("TBA", f"{API_TOKEN_ENV_VAR} enviornment variable not present")
         exit(1)
 
+    logging.log("TBA", "Got TBA API key from enviornmet")
     return Tba(API_TOKEN)
 
 
@@ -301,7 +311,7 @@ def res_is_good(res: requests.Response) -> bool:
     """
 
     if res.status_code != requests.codes.ok:
-        logging.error(f"request to '{res.request.path_url}' failed with code '{res.status_code}'")
+        logging.err("TBA", f"request to '{res.request.path_url}' failed with code '{res.status_code}'")
         return False
 
     return True

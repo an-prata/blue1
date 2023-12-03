@@ -4,7 +4,6 @@
 
 import discord
 import json
-import logging
 import math
 import os
 from collections import OrderedDict
@@ -13,19 +12,24 @@ from discord.ext import commands
 from functools import cmp_to_key, reduce
 from matplotlib import pyplot
 from time import sleep
+from typing import Optional
 from . import frc
 from . import tba
 from . import state
+from . import sheets
+from . import data
+from . import logging
 
 API_TOKEN_ENV_VAR = 'BLUE1_DISCORD_API_TOKEN'
 API_TOKEN: str = os.getenv(API_TOKEN_ENV_VAR)
 DISCORD_MAX_MESSAGE = 2000
 
 class Blue1:
-    bot:      commands.Bot
-    token:    str
-    tba:      tba.Tba
-    plotting: bool = False
+    bot:          commands.Bot
+    token:        str
+    tba:          tba.Tba
+    event_sheets: dict = {}
+    plotting:     bool = False
 
     def __init__(self, token: str, tba: tba.Tba):
         intents = discord.Intents.default()
@@ -222,6 +226,7 @@ class Blue1:
                 sleep(0.25)
 
             # deny plotting to other async calls to this method
+            logging.log("BOT", "Reserving PyPlot ...")
             self.plotting = True
 
             file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
@@ -239,6 +244,7 @@ class Blue1:
             pyplot.clf()
 
             # allow plotting by other async calls of this metho
+            logging.log("BOT", "Releasing PyPlot ...")
             self.plotting = False
             
             for m in message:
@@ -286,6 +292,7 @@ class Blue1:
                 sleep(0.25)
 
             # deny plotting to other async calls to this method
+            logging.log("BOT", "Reserving PyPlot ...")
             self.plotting = True
 
             file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
@@ -305,6 +312,7 @@ class Blue1:
             pyplot.clf()
 
             # allow plotting by other async calls of this method
+            logging.log("BOT", "Releasing PyPlot ...")
             self.plotting = False
                 
             await ctx.send("", file=discord.File(file_name))
@@ -315,6 +323,82 @@ class Blue1:
         async def get_cache_hit_rate(ctx):
             rate = float(self.tba.cache_hits) / float(self.tba.cache_misses + self.tba.cache_hits)
             await ctx.send(f"Cache hit rate is {round(rate, 4) * 100}%")
+        
+
+        @self.bot.command()
+        async def get_scouting_fields(ctx, event):
+            sheet = self.get_event_sheet(event)
+            
+            if sheet is None:
+                await ctx.send(
+                    f"No scouting spreadsheet has been set for `{event}`, " +
+                    'have a priviledged user use the ' + 
+                    f"`&set_scouting_sheet {event} [sheet_id]` command"
+                )
+                return
+
+            bounds = sheet.get_sheet_bounds()
+            fields = sheet.get_fields(bounds)
+            message = ''
+
+            for field in fields:
+                message = f"{message}\n{field}"
+
+            await ctx.send(
+                f"These are the available fields from your scouting data:\n" +
+                f"```\n{message}\n```"
+            )
+        
+
+        @self.bot.command()
+        async def match_breakdown(ctx, event, match_number, team_number):
+            sheet = self.get_event_sheet(event)
+            
+            if sheet is None:
+                await ctx.send(
+                    f"No scouting spreadsheet has been set for `{event}`, " +
+                    'have a priviledged user use the ' + 
+                    f"`&set_scouting_sheet {event} [sheet_id]` command"
+                )
+                return
+
+            bounds = sheet.get_sheet_bounds()
+            fields = sheet.get_fields(bounds)
+
+            teams_col_number = sheets.column_num_to_alpha(fields.index(data.TEAM_FIELD))
+            matches_col_number = sheets.column_num_to_alpha(fields.index(data.MATCH_FIELD))
+
+            teams_col = sheet.get_column_list(teams_col_number, bounds)
+            matches_col = sheet.get_column_list(matches_col_number, bounds)
+
+            team_match_row = (
+                zip(teams_col, matches_col)
+                .index(
+                    (team_number, match_number)
+                )
+            ) + 1 # Add one since both lists exclude the first row
+
+            row_dict = sheet.get_row_dict(int(team_match_row), bounds)
+            message = ''
+
+            for k, v in row_dict:
+                message = f"{message}\n{k}: {v}"
+
+            await ctx.send(message)
+                    
+
+        @self.bot.command()
+        async def set_scouting_sheet(ctx, event, sheet_id):
+            if not await check_priviledges(ctx):
+                return
+
+            creds = sheets.produce_valid_credentials()
+            service = sheets.get_sheets_service(creds)
+            self.event_sheets[event] = sheets.Spreadsheet(service, sheet_id)
+            
+            state.STATE.set(f"scouting_sheet_id_{event}", sheet_id)
+            logging.log("BOT", f"Set scouting sheet for '{event}' to '{sheet_id}'")
+            await ctx.send(f"Set scouting spreadsheet id to {sheet_id} for {event}")
         
 
         @self.bot.command()
@@ -345,10 +429,34 @@ class Blue1:
                 )
 
             state.STATE.set('cache_expiration_time', delta)
+            logging.log("BOT", f"Set cache expiration time to {delta} seconds")
 
 
     async def start(self):
         await self.bot.start(self.token, reconnect=True)
+
+
+    def get_event_sheet(self, event: str) -> Optional[sheets.Spreadsheet]:
+        """
+        Get an event's scouting spreadsheet if it has been saved, otherwise 
+        produce it from a sheet ID if it has been set. If both options fail this
+        method returns `None`.
+        """
+        try:
+            return self.event_sheets[event]
+        except:
+            pass
+
+        id = state.STATE.get(f"scouting_sheet_id_{event}")
+
+        if id is None:
+            return None
+
+        creds = sheets.produce_valid_credentials()
+        service = sheets.get_sheets_service(creds)
+        sheet = sheets.Spreadsheet(service, id)
+        self.event_sheets[event] = sheet
+        return sheet
         
 
 def blue1_from_env(tba: tba.Tba) -> Blue1:
@@ -358,10 +466,13 @@ def blue1_from_env(tba: tba.Tba) -> Blue1:
     and exits the program.
     """
 
+    logging.log("BOT", "Getting Discord API key from enviorment ...")
+
     if API_TOKEN is None:
-        logging.critical(f"{API_TOKEN_ENV_VAR} enviornment variable not present")
+        logging.err("BOT", f"{API_TOKEN_ENV_VAR} enviornment variable not present")
         exit(1)
 
+    logging.log("BOT", "Got Discord API key from enviorment")
     return Blue1(API_TOKEN, tba)
 
 async def check_priviledges(ctx):
@@ -373,6 +484,7 @@ async def check_priviledges(ctx):
             continue
 
     if not priviledged:
+        logging.warn("BOT", "Attempt to use priviledged command by unpriviledged user")
         await ctx.send('You need to have the Blue1 priviledged role to use this command')
         return False
 
