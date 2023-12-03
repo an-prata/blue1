@@ -365,23 +365,31 @@ class Blue1:
             bounds = sheet.get_sheet_bounds()
             fields = sheet.get_fields(bounds)
 
-            teams_col_number = sheets.column_num_to_alpha(fields.index(data.TEAM_FIELD))
-            matches_col_number = sheets.column_num_to_alpha(fields.index(data.MATCH_FIELD))
+            teams_col_number = sheets.column_num_to_alpha(fields.index(data.TEAM_FIELD) + 1)
+            matches_col_number = sheets.column_num_to_alpha(fields.index(data.MATCH_FIELD) + 1)
 
             teams_col = sheet.get_column_list(teams_col_number, bounds)
             matches_col = sheet.get_column_list(matches_col_number, bounds)
 
-            team_match_row = (
-                zip(teams_col, matches_col)
-                .index(
-                    (team_number, match_number)
-                )
-            ) + 1 # Add one since both lists exclude the first row
+            team_match_row: Optional[int]
+
+            for i in range(len(teams_col)):
+                if teams_col[i] == team_number and matches_col[i] == match_number:
+                    team_match_row = i + 1
+                    break
+                else:
+                     team_match_row = None
+
+            if team_match_row is None:
+                await ctx.send(f"Could not find match `{match_number}`, or `{team_number}` didn't play that match.\nKeep in mind that your scouting sheet may call matches different names than TBA does.")
+                return
+            else:
+                team_match_row += 1
 
             row_dict = sheet.get_row_dict(int(team_match_row), bounds)
             message = ''
 
-            for k, v in row_dict:
+            for k, v in row_dict.items():
                 message = f"{message}\n{k}: {v}"
 
             await ctx.send(message)
@@ -442,19 +450,24 @@ class Blue1:
         produce it from a sheet ID if it has been set. If both options fail this
         method returns `None`.
         """
+
         try:
+            logging.log("BOT", f"Sheet for {event} already instantiated")
             return self.event_sheets[event]
         except:
             pass
 
+        logging.log("BOT", f"Getting sheet for {event} ...")
         id = state.STATE.get(f"scouting_sheet_id_{event}")
 
         if id is None:
+            logging.log("BOT", f"No sheet set for {event}")
             return None
 
         creds = sheets.produce_valid_credentials()
         service = sheets.get_sheets_service(creds)
         sheet = sheets.Spreadsheet(service, id)
+        logging.log("BOT", f"Instantiated sheet for {event}, saving ...")
         self.event_sheets[event] = sheet
         return sheet
         

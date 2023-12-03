@@ -266,6 +266,9 @@ def column_num_to_alpha(num: int) -> str:
     Converts a column number to a string representing that column.
     """
     
+    if num < 1:
+        logging.log("SHEETS", "Columns are considered 1 indexed, not zero")
+    
     A = 65
 
     num -= 1
