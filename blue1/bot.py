@@ -409,6 +409,33 @@ class Blue1:
             logging.log("BOT", f"Set cache expiration time to {delta} seconds")
 
 
+        @self.bot.command()
+        async def print_help(ctx):
+            help0 = (
+                "To use `blue1` command prefix them with `&`, here are the avaiable commands:\n"
+                + "`&get_team [team_number]` - Gets basic team info given their number\n"
+                + "`&get_match [match_id]` - Gets match info, `[match_id]` is in the format `2023cabl_qm60`, which is the event ID and match ID seperated by an underscore, match IDs are formated `qm[num]`, `sf[num]m[num]`, and `f[num]m[num]`. The first number always refers to a set between the same teams, so finals are usually `f1m[1-3]`. Semifinals usually end in `1`.\n"
+                + "`&get_event [event_id]` - Gets event info, `[event_id]` is in the format `[year][state_or_province_abr][event_abr]`, e.g. Beach Blitch in 2023 was `2023cabl`\n"
+                + "`&get_team_rank [team_number] [event_id]` - Plots info about a teams rank for an event, see above for argument format.\n"
+                + "`&get_event_rankings [event_id]` - gets the rankings of all teams at an event. See above for argument format.\n"
+                + "`&get_event_matches [event_id]` - Gets a summary of all matches played at the given event. See above for argument format.\n"
+                + "`&get_team_event [team_number] [event_id]` - Gets a summary of all matches a team played during an event, and plots their score over time. See above for argument format.\n"
+            )
+
+            help1 = (
+                "`&compare_teams_event [team_number] [team_number] [event_id]` - Compares two teams performance at an event. See above for argument format.\n"
+                + "`&get_scouting_fields [event_id]` - Gets available fields for an event. NOTE: Requires a scouting sheet be set for the given event.\n"
+                + "`&plot_scouting_field [event_id] [team_number] [field]` - Plots a numeric field from scouting data, you may have to wrap the `[field]` argument in quotes if it contains spaces. NOTE: Requires a scouting sheet be set for the given event.\n"
+                + "`&match_breakdown [event_id] [match_number] [team_number]` - Gives a match breakdown from scouting data. `[match_number]` is the match number given in scouting forms, not from TBA. NOTE: Requires a scouting sheet be set for the given event."
+                + "`&set_scouting_sheet [event_id] [sheet_id]` - *Requires Priviledged Role.* Sets the scouting sheet for the given event.\n"
+                + "`&set_cache_expiration_time [time] [unit]` - *Requires Priviledged Role.* Sets the time till a cache item is considered expired.\n"
+                + "`&get_cache_hit_rate` - Yeilds the rate at which cache items are used in favor of sending a new request to an API."
+            )
+
+            await ctx.send(help0)
+            await ctx.send(help1)
+
+
     async def start(self):
         await self.bot.start(self.token, reconnect=True)
 
