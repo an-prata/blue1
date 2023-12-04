@@ -274,12 +274,13 @@ class Tba:
             response = requests.get(url, headers=headers)
             data = response.json() if res_is_good(response) else None
 
-            value = {
-                'time': round(time.time()),
-                'response': data
-            }
+            if data is not None:
+                value = {
+                    'time': round(time.time()),
+                    'response': data
+                }
+                state.CACHE.set(path, value)
 
-            state.CACHE.set(path, value)
             return data
 
         logging.log("TBA", f"Cache hit for '{path}'")
