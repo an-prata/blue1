@@ -106,45 +106,8 @@ class Blue1:
                 # negate to display lesser value ranks higher
                 rank_v_time.append(curr_rank)
 
-            while self.plotting:
-                sleep(0.25)
-
-            # deny plotting to other async calls to this method
-            self.plotting = True
-
-            file1_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
-            
-            pyplot.plot(range(1, len(rank_v_time) + 1), rank_v_time, linewidth=2, color='blue')
-            pyplot.xlabel('qualifying match number')
-            pyplot.ylabel(f"team {team_number}'s rank")
-            pyplot.xticks(range(0, len(rank_v_time), 10))
-
-            _, upper = pyplot.ylim()
-            pyplot.ylim(upper, 0)
-
-            pyplot.savefig(file1_name)
-            pyplot.clf()
-
-            file2_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
-            
-            pyplot.plot(range(1, len(rp_avg_v_time) + 1), rp_avg_v_time, linewidth=2, color='blue')
-            pyplot.xlabel('qualifying match number')
-            pyplot.ylabel(f"team {team_number}'s average RP award")
-            pyplot.xticks(range(0, len(rp_avg_v_time), 10))
-
-            _, upper = pyplot.ylim()
-            pyplot.ylim(0, upper)
-
-            pyplot.savefig(file2_name)
-            pyplot.clf()
-
-            # allow plotting by other async calls of this metho
-            self.plotting = False
-
-            await ctx.send("", file=discord.File(file1_name))
-            await ctx.send("", file=discord.File(file2_name))
-            os.remove(file1_name)
-            os.remove(file2_name)
+            await self.plot_line(ctx, rank_v_time, 'qualifying match number', f"team {team_number}'s rank", ticks=range(0, len(rp_avg_v_time), 10))
+            await self.plot_line(ctx, rp_avg_v_time, 'qualifying match number', f"team {team_number}'s average RP award", ticks=range(0, len(rp_avg_v_time), 10))
 
 
         @self.bot.command()
@@ -222,36 +185,10 @@ class Blue1:
 
                 team_scores.append(match.get_team_score(team_number))
             
-            while self.plotting:
-                sleep(0.25)
-
-            # deny plotting to other async calls to this method
-            logging.log("BOT", "Reserving PyPlot ...")
-            self.plotting = True
-
-            file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
-            
-            pyplot.plot(range(1, len(team_scores) + 1), team_scores, linewidth=2, color='blue')
-            pyplot.plot(range(1, len(team_scores) + 1), team_scores, 'o', color='blue')
-            pyplot.xlabel('matches played')
-            pyplot.ylabel(f"team {team_number}'s score")
-            pyplot.xticks(range(1, len(team_scores) + 1))
-
-            _, upper = pyplot.ylim()
-            pyplot.ylim(0, upper)
-
-            pyplot.savefig(file_name)
-            pyplot.clf()
-
-            # allow plotting by other async calls of this metho
-            logging.log("BOT", "Releasing PyPlot ...")
-            self.plotting = False
-            
             for m in message:
                 await ctx.send(m)
                 
-            await ctx.send("", file=discord.File(file_name))
-            os.remove(file_name)
+            await self.plot_line(ctx, team_scores, 'matches played', f"team {team_number}'s score")
 
 
         @self.bot.command()
@@ -351,6 +288,38 @@ class Blue1:
         
 
         @self.bot.command()
+        async def plot_scouting_field(ctx, event, team_number, field):
+            sheet = self.get_event_sheet(event)
+            
+            if sheet is None:
+                await ctx.send(
+                    f"No scouting spreadsheet has been set for `{event}`, " +
+                    'have a priviledged user use the ' + 
+                    f"`&set_scouting_sheet {event} [sheet_id]` command"
+                )
+                return
+
+            bounds = sheet.get_sheet_bounds()
+            fields = sheet.get_fields(bounds)
+
+            if field not in fields:
+                await ctx.send(f"`{field}` not found in scouting data.\nUse `&get_scouting_fields [event_id]` to see avaiable fields.")
+                return
+
+            teams_col_number = sheets.column_num_to_alpha(fields.index(data.TEAM_FIELD) + 1)
+            teams_col = sheet.get_column_list(teams_col_number, bounds)
+            field_data = (
+                # Add two becuase we get a 0 based index and the sheet is 1 
+                # indexed, and because the top row is not data, just labels.
+                [sheet.get_row_dict(r + 2, bounds)[field]
+                    for r in range(len(teams_col)) if teams_col[r] == team_number ]
+            )
+            field_data = [0 if x is None or x == '' else int(x) for x in field_data]
+
+            await self.plot_line(ctx, field_data, 'matches played', f"`{field}`")
+            
+        
+        @self.bot.command()
         async def match_breakdown(ctx, event, match_number, team_number):
             sheet = self.get_event_sheet(event)
             
@@ -444,6 +413,41 @@ class Blue1:
         await self.bot.start(self.token, reconnect=True)
 
 
+    async def plot_line(self, ctx, data, x_label: str, y_label: str, ticks=None):            
+        """
+        Plots the given data and sends it in discord.
+        """
+        
+        # Wait for plotting
+        while self.plotting:
+            sleep(0.25)
+
+        # deny plotting to other async calls to this method
+        logging.log("BOT", "Reserving PyPlot ...")
+        self.plotting = True
+
+        file_name = f"/tmp/blue1-{datetime.now().strftime('%M%I%S%f')}.png"
+    
+        pyplot.plot(range(1, len(data) + 1), data, linewidth=2, color='blue')
+        pyplot.plot(range(1, len(data) + 1), data, 'o', color='blue')
+        pyplot.xlabel(x_label)
+        pyplot.ylabel(y_label)
+        pyplot.xticks(range(1, len(data) + 1) if ticks is None else ticks)
+
+        _, upper = pyplot.ylim()
+        pyplot.ylim(0, upper)
+
+        pyplot.savefig(file_name)
+        pyplot.clf()
+
+        # allow plotting by other async calls of this metho
+        logging.log("BOT", "Releasing PyPlot ...")
+        self.plotting = False
+
+        await ctx.send("", file=discord.File(file_name))
+        os.remove(file_name)
+
+
     def get_event_sheet(self, event: str) -> Optional[sheets.Spreadsheet]:
         """
         Get an event's scouting spreadsheet if it has been saved, otherwise 
@@ -502,3 +506,4 @@ async def check_priviledges(ctx):
         return False
 
     return True
+
