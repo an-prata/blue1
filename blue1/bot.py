@@ -42,27 +42,45 @@ class Blue1:
         @self.bot.command()
         async def get_team(ctx, team):
             data = self.tba.get_team(int(team))
-            await ctx.send(data.pretty_print())
+
+            if data is None:
+                await ctx.send(f"Could not find team `{team}`")
+            else:
+                await ctx.send(data.pretty_print())
 
 
         @self.bot.command()
         async def get_match(ctx, match_id):
             match = self.tba.get_match(match_id)
-            await ctx.send(match.pretty_print())
+
+            if match is None:
+                await ctx.send(f"Could not find match `{match_id}`")
+            else:
+                await ctx.send(match.pretty_print())
 
 
         @self.bot.command()
         async def get_event(ctx, event_id):
             event = self.tba.get_event(event_id)
-            await ctx.send(event.pretty_print())
+
+            if event is None:
+                await ctx.send(f"Could not find match `{event_id}`")
+            else:
+                await ctx.send(event.pretty_print())
 
 
         @self.bot.command()
         async def get_team_rank(ctx, team_number, event_id):
             team_number = int(team_number)
             teams = self.tba.get_event_teams(event_id)
+            matches_list = self.tba.get_event_matches(event_id)
+
+            if teams is None or matches_list is None:
+                await ctx.send(f"Could not find event `{event_id}`")
+                return
+
             matches = sorted(
-                self.tba.get_event_matches(event_id),
+                matches_list,
                 key=cmp_to_key(frc.match_cmp)
             )
 
@@ -113,6 +131,11 @@ class Blue1:
         @self.bot.command()
         async def get_event_rankings(ctx, event_id):
             rankings = self.tba.get_event_rankings(event_id)
+
+            if rankings is None:
+                await ctx.send(f"Could not find event `{event_id}`")
+                return
+            
             message = "Rank:\tTeam Number"
 
             for r, t in rankings:
@@ -124,8 +147,14 @@ class Blue1:
 
         @self.bot.command()
         async def get_event_matches(ctx, event_id):
+            matches_list = self.tba.get_event_matches(event_id)
+
+            if matches_list is None:
+                await ctx.send(f"Could not find event `{event_id}`")
+                return
+            
             matches = sorted(
-                self.tba.get_event_matches(event_id),
+                matches_list,
                 key=cmp_to_key(frc.match_cmp)
             )
 
@@ -153,16 +182,22 @@ class Blue1:
         @self.bot.command()
         async def get_team_event(ctx, team_number, event_id):
             team_number = int(team_number)
+            matches_list = self.tba.get_team_matches(
+                team_number, 
+                event_id=event_id
+            )
+
+            if matches_list is None:
+                await ctx.send(f"Team `{team_number}` does not exist, did not attend event `{event_id}`, or could not find event `{event_id}`")
+                return
+            
             matches = sorted(
-                self.tba.get_team_matches(
-                    team_number, 
-                    event_id=event_id
-                ), 
+                matches_list, 
                 key=cmp_to_key(frc.match_cmp)
             )
 
             if len(matches) < 1:
-                await ctx.send(f"no matched for {team} at {event_id}")
+                await ctx.send(f"No matches for `{team}` at `{event_id}`")
                 return
 
             team_scores: [int] = []
@@ -196,18 +231,34 @@ class Blue1:
             team1_number = int(team1_number)
             team2_number = int(team2_number)
 
+            team1_matches_list = self.tba.get_team_matches(team1_number, event_id)
+            team2_matches_list = self.tba.get_team_matches(team2_number, event_id)
+            event_matches_list = self.tba.get_event_matches(event_id)
+
+            if event_matches_list is None:
+                await ctx.send(f"Could not find event `{event_id}`")
+                return
+            
+            if team1_matches_list is None:
+                await ctx.send(f"Team `{team1_number}` does not exist or did not attend event `{event_id}`")
+                return
+            
+            if team2_matches_list is None:
+                await ctx.send(f"Team `{team2_number}` does not exist or did not attend event `{event_id}`")
+                return
+
             team1_matches = sorted(
-                self.tba.get_team_matches(team1_number, event_id),
+                team1_matches_list,
                 key=cmp_to_key(frc.match_cmp)
             )
 
             team2_matches = sorted(
-                self.tba.get_team_matches(team2_number, event_id),
+                team2_matches_list,
                 key=cmp_to_key(frc.match_cmp)
             )
 
             event_matches = sorted(
-                self.tba.get_event_matches(event_id),
+                event_matches_list,
                 key=cmp_to_key(frc.match_cmp)
             )
 
@@ -437,6 +488,7 @@ class Blue1:
 
 
     async def start(self):
+        logging.log("BOT", "Starting Discord bot ...")
         await self.bot.start(self.token, reconnect=True)
 
 
@@ -518,6 +570,7 @@ def blue1_from_env(tba: tba.Tba) -> Blue1:
 
     logging.log("BOT", "Got Discord API key from enviorment")
     return Blue1(API_TOKEN, tba)
+
 
 async def check_priviledges(ctx):
     priviledged = False

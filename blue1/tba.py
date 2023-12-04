@@ -56,6 +56,10 @@ class Tba:
         """
 
         data_matches = self.get_team_matches_json(team_number, event_id=event_id)
+
+        if data_matches is None:
+            return None
+        
         matches: [frc.Match] = [frc.Match(m) for m in data_matches]
         return matches
     
@@ -92,6 +96,10 @@ class Tba:
         """
 
         data_matches = self.get_event_matches_json(event_id)
+
+        if data_matches is None:
+            return None
+        
         matches: [frc.Match] = [frc.Match(m) for m in data_matches]
         return sorted(matches, key=cmp_to_key(frc.match_cmp))
 
@@ -104,6 +112,10 @@ class Tba:
         """
 
         data = self.get_event_rankings_json(event_id)
+
+        if data is None:
+            return None
+        
         rankings: [(int, int)] = sorted(
             [(r['rank'], frc.team_number_from_id(r['team_key'])) for r in data['rankings']],
             key=lambda r: r[0]
@@ -117,6 +129,10 @@ class Tba:
         """
 
         data = self.get_event_teams_json(event_id, simple=True)
+
+        if data is None:
+            return None
+
         teams: [int] = [team['team_number'] for team in data]
         return teams
     
