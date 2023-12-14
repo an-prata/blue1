@@ -4,11 +4,15 @@
 
 import sys
 import datetime
+import inspect
+import os
 from enum import StrEnum
 from . import state
 
 LOG_PATH = f"{state.XDG_STATE_HOME}/blue1.log"
 LOG_FILE = None
+
+dbg_enabled = False
 
 class Color(StrEnum):
     RED    = "\033[31m"
@@ -89,3 +93,35 @@ def err(id: str, *kargs):
         LOG_FILE.flush()
         
 
+def dbg(data: any) -> any:
+    """
+    Log a debug message, only prints of debug messages are enabled with 
+    `enable_dbg()`. Returns the `data` given. Debug logs are not saved to file.
+    """
+
+    global dbg_enabled
+
+    if dbg_enabled:
+        time = datetime.datetime.now()
+        caller = inspect.stack()[1]
+        filename = caller.filename.removeprefix(os.getcwd() + '/')
+        line = caller.lineno
+        sys.stdout.write(f"[{Color.BOLD}DBG{Color.NORMAL}]  [{time}] ['{filename}' (line {line})]: {data}\n")
+
+    return data
+
+
+def enable_dbg(enable: bool = True):
+    """
+    Enables or disables the printing of verbose debug messages to stdout.
+    """
+
+    global dbg_enabled
+
+    if not enable:
+        dbg(f"Disabled {Color.BOLD}DBG{Color.NORMAL} log")
+    
+    dbg_enabled = enable
+
+    if enable:
+        dbg(f"Enabled {Color.BOLD}DBG{Color.NORMAL} log")
