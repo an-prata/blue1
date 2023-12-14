@@ -198,6 +198,26 @@ class Match:
         """
         
         return self.set_number * self.match_number
+
+
+    def contains_team(self, team: int):
+        """
+        Returns true if `team` is in this match.
+        """
+        
+        return team in self.red_alliance_teams or team in self.blue_alliance_teams
+
+
+    def contains_opponent(self, team: int, opponent: int):
+        """
+        Returns true if `opponent` and `team` were on opposite sides of this
+        match.
+        """
+
+        return (
+            team in self.blue_alliance_teams and opponent in self.blue_alliance_teams or
+            team in self.red_alliance_teams and opponent in self.blue_alliance_teams
+        )
     
 
     def pretty_print(self) -> str:
