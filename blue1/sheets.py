@@ -21,10 +21,9 @@ sheet_max_row = 100
 SHEET_BOUNDS_X_CELL = 'A1'
 SHEET_BOUNDS_Y_CELL = 'B1'
 SHEET_BOUNDS_RANGE = f"{SHEET_BOUNDS_X_CELL}:{SHEET_BOUNDS_Y_CELL}"
-
-
 DEFAULT_SHEET_NAME = 'Sheet1'
 
+active_sheets: dict = {}
 
 class ValueInputOption(StrEnum):
     RAW = 'RAW'
