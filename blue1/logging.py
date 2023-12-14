@@ -84,8 +84,7 @@ def err(id: str, *kargs):
 
     for arg in kargs:
         time = datetime.datetime.now()
-        # sys.stderr.write(f"[{Color.RED}{Color.BOLD}ERR{Color.NORMAL}]  [{time}] [{Color.BOLD}{id}{Color.NORMAL}]: {arg}\n")
-        sys.stdout.write(f"[{Color.RED}{Color.BOLD}ERR{Color.NORMAL}]  [{time}] [{Color.BOLD}{id}{Color.NORMAL}]: {arg}\n")
+        sys.stderr.write(f"[{Color.RED}{Color.BOLD}ERR{Color.NORMAL}]  [{time}] [{Color.BOLD}{id}{Color.NORMAL}]: {arg}\n")
 
         if LOG_FILE is None:
             continue
