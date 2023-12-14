@@ -18,6 +18,7 @@ API_TOKEN:            str  = os.getenv(API_TOKEN_ENV_VAR)
 API_TOKEN_HEADER_KEY: str  = 'X-TBA-Auth-Key'
 API_HEADERS:          dict = { API_TOKEN_HEADER_KEY : API_TOKEN }
 
+
 class Tba:
     token: str
     cache_hits: int = 0
@@ -51,8 +52,8 @@ class Tba:
 
     def get_team_matches(self, team_number: int, event_id: str) -> [frc.Match]:
         """
-        Gets a list of matches that the given team played in for the given 
-        event by team number and event ID.
+        Gets a list of matches that the given team is in for the given event
+        by team number and event ID.
         """
 
         data_matches = self.get_team_matches_json(team_number, event_id=event_id)
@@ -304,6 +305,19 @@ class Tba:
         return cache_item['response']
 
 
+def res_is_good(res: requests.Response) -> bool:
+    """
+    Returns true if the response indicates success. If the response indicates
+    failure it will be logged as an error.  
+    """
+
+    if res.status_code != requests.codes.ok:
+        logging.err("TBA", f"request to '{res.request.path_url}' failed with code '{res.status_code}'")
+        return False
+
+    return True
+
+
 def tba_from_env() -> Tba:
     """
     Creates a new `Tba` with a token derived from an enviornment variable. If
@@ -321,14 +335,6 @@ def tba_from_env() -> Tba:
     return Tba(API_TOKEN)
 
 
-def res_is_good(res: requests.Response) -> bool:
-    """
-    Returns true if the response indicates success. If the response indicates
-    failure it will be logged as an error.  
-    """
+TBA = tba_from_env()
 
-    if res.status_code != requests.codes.ok:
-        logging.err("TBA", f"request to '{res.request.path_url}' failed with code '{res.status_code}'")
-        return False
 
-    return True
