@@ -16,9 +16,9 @@ XDG_CACHE_HOME:  str = os.getenv('XDG_CACHE_HOME') or f"{HOME_DIR}/.cache"
 STATE_FILE_PATH: str = f"{XDG_STATE_HOME}/blue1/state.json"
 CACHE_FILE_PATH: str = f"{XDG_CACHE_HOME}/blue1/cache.json"
 
-class FileDictMonad:
+class FileDict:
     """
-    A monad wrapping a `dict` that is repeatadly saved to disk.
+    A class wrapping a `dict` that is repeatadly saved to disk.
     """
     
     state_json: dict
@@ -63,5 +63,5 @@ class FileDictMonad:
             return None
 
 
-STATE = FileDictMonad(STATE_FILE_PATH)
-CACHE = FileDictMonad(CACHE_FILE_PATH)
+STATE = FileDict(STATE_FILE_PATH)
+CACHE = FileDict(CACHE_FILE_PATH)
