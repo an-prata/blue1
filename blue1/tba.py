@@ -276,7 +276,9 @@ class Tba:
 
         if cache_expiration_time is None:
             logging.log("TBA", f"Requesting '{path}' (cache disabled)")
-            return requests.get(url, headers=headers).json()
+            response = requests.get(url, headers=headers).json()
+            logging.log("TBA", f"Got response for '{path}' (cache disabled)")
+            return response
         
         cache_item: (int, requests.Response) = state.CACHE.get(path)
 
@@ -290,6 +292,7 @@ class Tba:
 
             response = requests.get(url, headers=headers)
             data = response.json() if res_is_good(response) else None
+            logging.log("TBA", f"Got response for '{path}'")
 
             if data is not None:
                 value = {
