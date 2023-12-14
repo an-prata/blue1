@@ -6,6 +6,7 @@ import discord
 import json
 import math
 import os
+import asyncio
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from discord.ext import commands
@@ -19,6 +20,7 @@ from . import state
 from . import sheets
 from . import data
 from . import logging
+from . import events
 
 API_TOKEN_ENV_VAR = 'BLUE1_DISCORD_API_TOKEN'
 API_TOKEN: str = os.getenv(API_TOKEN_ENV_VAR)
@@ -27,21 +29,47 @@ DISCORD_MAX_MESSAGE = 2000
 class Blue1:
     bot:          commands.Bot
     token:        str
-    tba:          tba.Tba
-    event_sheets: dict = {}
     plotting:     bool = False
 
-    def __init__(self, token: str, tba: tba.Tba):
+    notification_loop_task: Optional[asyncio.Task] = None
+    notification_manager: events.EventManager = events.EventManager()
+    notification_contexts: list = []
+
+    def __init__(self, token: str):
         intents = discord.Intents.default()
         intents.message_content = True
         self.bot = commands.Bot(command_prefix='&', intents=intents)
         self.token = token
-        self.tba = tba
 
+        async def notif_loop():
+            while True:
+                logging.dbg("Iterated event notification loop")
+
+                for (opts, event_state) in self.notification_manager.produce_events():
+                    if opts.type == events.EventType.RANK_CHANGED:
+                        if opts.team is None:
+                            continue
+
+                        for (ctx_opts, ctx) in self.notification_contexts:
+                            if ctx_opts == opts:
+                                await ctx.send(f"@everyone Team {opts.team}'s rank is now {event_state[opts.team]}'")
+                    elif opts.type == events.EventType.MATCH_SCOUTED:
+                        if opts.team is None:
+                            continue
+
+                        for (ctx_opts, ctx) in self.notification_contexts:
+                            if ctx_opts == opts:
+                                await ctx.send(f"@everyone Team {opts.team} has been scouted!")
+
+                sleep_time = state.CACHE.get('cache_expiration_time') or 60
+                await asyncio.sleep(sleep_time)
+
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(notif_loop())
 
         @self.bot.command()
         async def get_team(ctx, team):
-            data = self.tba.get_team(int(team))
+            data = tba.TBA.get_team(int(team))
 
             if data is None:
                 await ctx.send(f"Could not find team `{team}`")
@@ -51,7 +79,7 @@ class Blue1:
 
         @self.bot.command()
         async def get_match(ctx, match_id):
-            match = self.tba.get_match(match_id)
+            match = tba.TBA.get_match(match_id)
 
             if match is None:
                 await ctx.send(f"Could not find match `{match_id}`")
@@ -61,7 +89,7 @@ class Blue1:
 
         @self.bot.command()
         async def get_event(ctx, event_id):
-            event = self.tba.get_event(event_id)
+            event = tba.TBA.get_event(event_id)
 
             if event is None:
                 await ctx.send(f"Could not find match `{event_id}`")
@@ -72,8 +100,8 @@ class Blue1:
         @self.bot.command()
         async def get_team_rank(ctx, team_number, event_id):
             team_number = int(team_number)
-            teams = self.tba.get_event_teams(event_id)
-            matches_list = self.tba.get_event_matches(event_id)
+            teams = tba.TBA.get_event_teams(event_id)
+            matches_list = tba.TBA.get_event_matches(event_id)
 
             if teams is None or matches_list is None:
                 await ctx.send(f"Could not find event `{event_id}`")
@@ -130,7 +158,7 @@ class Blue1:
 
         @self.bot.command()
         async def get_event_rankings(ctx, event_id):
-            rankings = self.tba.get_event_rankings(event_id)
+            rankings = tba.TBA.get_event_rankings(event_id)
 
             if rankings is None:
                 await ctx.send(f"Could not find event `{event_id}`")
@@ -147,7 +175,7 @@ class Blue1:
 
         @self.bot.command()
         async def get_event_matches(ctx, event_id):
-            matches_list = self.tba.get_event_matches(event_id)
+            matches_list = tba.TBA.get_event_matches(event_id)
 
             if matches_list is None:
                 await ctx.send(f"Could not find event `{event_id}`")
@@ -182,7 +210,7 @@ class Blue1:
         @self.bot.command()
         async def get_team_event(ctx, team_number, event_id):
             team_number = int(team_number)
-            matches_list = self.tba.get_team_matches(
+            matches_list = tba.TBA.get_team_matches(
                 team_number, 
                 event_id=event_id
             )
@@ -231,9 +259,9 @@ class Blue1:
             team1_number = int(team1_number)
             team2_number = int(team2_number)
 
-            team1_matches_list = self.tba.get_team_matches(team1_number, event_id)
-            team2_matches_list = self.tba.get_team_matches(team2_number, event_id)
-            event_matches_list = self.tba.get_event_matches(event_id)
+            team1_matches_list = tba.TBA.get_team_matches(team1_number, event_id)
+            team2_matches_list = tba.TBA.get_team_matches(team2_number, event_id)
+            event_matches_list = tba.TBA.get_event_matches(event_id)
 
             if event_matches_list is None:
                 await ctx.send(f"Could not find event `{event_id}`")
@@ -309,7 +337,7 @@ class Blue1:
 
         @self.bot.command()
         async def get_cache_hit_rate(ctx):
-            rate = float(self.tba.cache_hits) / float(self.tba.cache_misses + self.tba.cache_hits)
+            rate = float(tba.TBA.cache_hits) / float(tba.TBA.cache_misses + tba.TBA.cache_hits)
             await ctx.send(f"Cache hit rate is {round(rate, 4) * 100}%")
         
 
@@ -413,7 +441,25 @@ class Blue1:
                 message = f"{message}\n{k}: {v}"
 
             await ctx.send(message)
-                    
+
+
+        @self.bot.command()
+        async def notify_rank_change(ctx, event, team):
+            if not await check_priviledges(ctx):
+                return
+            
+            logging.dbg(f"Adding new rank notification for {event} for team {team}")
+
+            team = int(team)
+            options = events.EventOptions(events.EventType.RANK_CHANGED, event, team)
+            logging.dbg(f"Created rank change event for {event} for team {team}")
+
+            self.notification_manager.subscribe(options)
+            self.notification_contexts.append((options, ctx))
+
+            logging.dbg(f"Added new rank notification for {event} for team {team}")
+            await ctx.send("Added event to notifications")
+        
 
         @self.bot.command()
         async def set_scouting_sheet(ctx, event, sheet_id):
@@ -422,7 +468,7 @@ class Blue1:
 
             creds = sheets.produce_valid_credentials()
             service = sheets.get_sheets_service(creds)
-            self.event_sheets[event] = sheets.Spreadsheet(service, sheet_id)
+            sheets.active_sheets[event] = sheets.Spreadsheet(service, sheet_id)
             
             state.STATE.set(f"scouting_sheet_id_{event}", sheet_id)
             logging.log("BOT", f"Set scouting sheet for '{event}' to '{sheet_id}'")
@@ -461,6 +507,24 @@ class Blue1:
 
 
         @self.bot.command()
+        async def enable_dbg(ctx):
+            if not await check_priviledges(ctx):
+                return
+
+            logging.enable_dbg(enable=True)
+            await ctx.send("DBG logs now being written to `stdout`")
+
+
+        @self.bot.command()
+        async def disable_dbg(ctx):
+            if not await check_priviledges(ctx):
+                return
+
+            logging.enable_dbg(enable=False)
+            await ctx.send("DBG logs will no longer be written to `stdout`")
+        
+
+        @self.bot.command()
         async def print_help(ctx):
             help0 = (
                 "To use `blue1` command prefix them with `&`, here are the avaiable commands:\n"
@@ -477,10 +541,13 @@ class Blue1:
                 "`&compare_teams_event [team_number] [team_number] [event_id]` - Compares two teams performance at an event. See above for argument format.\n"
                 + "`&get_scouting_fields [event_id]` - Gets available fields for an event. NOTE: Requires a scouting sheet be set for the given event.\n"
                 + "`&plot_scouting_field [event_id] [team_number] [field]` - Plots a numeric field from scouting data, you may have to wrap the `[field]` argument in quotes if it contains spaces. NOTE: Requires a scouting sheet be set for the given event.\n"
-                + "`&match_breakdown [event_id] [match_number] [team_number]` - Gives a match breakdown from scouting data. `[match_number]` is the match number given in scouting forms, not from TBA. NOTE: Requires a scouting sheet be set for the given event."
+                + "`&match_breakdown [event_id] [match_number] [team_number]` - Gives a match breakdown from scouting data. `[match_number]` is the match number given in scouting forms, not from TBA. NOTE: Requires a scouting sheet be set for the given event.\n"
+                + "`&notify_rank_change [event_id] [team_number]` - *Requires Priviledged Role.* Notifies with a ping to everyone when the given team's rank changes at this given event.\n"
                 + "`&set_scouting_sheet [event_id] [sheet_id]` - *Requires Priviledged Role.* Sets the scouting sheet for the given event.\n"
                 + "`&set_cache_expiration_time [time] [unit]` - *Requires Priviledged Role.* Sets the time till a cache item is considered expired.\n"
-                + "`&get_cache_hit_rate` - Yeilds the rate at which cache items are used in favor of sending a new request to an API."
+                + "`&get_cache_hit_rate` - Yeilds the rate at which cache items are used in favor of sending a new request to an API.\n"
+                + "`&enable_dbg` - *Requires Priviledged Role.* Enables the printing of DBG logs to stdout.\n"
+                + "`&disable_dbg` - *Requires Priviledged Role.* Disables the printing of DBG logs to stdout."
             )
 
             await ctx.send(help0)
@@ -536,7 +603,7 @@ class Blue1:
 
         try:
             logging.log("BOT", f"Sheet for {event} already instantiated")
-            return self.event_sheets[event]
+            return sheets.active_sheets[event]
         except:
             pass
 
@@ -551,11 +618,11 @@ class Blue1:
         service = sheets.get_sheets_service(creds)
         sheet = sheets.Spreadsheet(service, id)
         logging.log("BOT", f"Instantiated sheet for {event}, saving ...")
-        self.event_sheets[event] = sheet
+        sheets.active_sheets[event] = sheet
         return sheet
         
 
-def blue1_from_env(tba: tba.Tba) -> Blue1:
+def blue1_from_env() -> Blue1:
     """
     Creates a new `Blue1` with a token derived from an enviornment variable. If
     the required variable is not present, this function logs a critical error
@@ -569,7 +636,7 @@ def blue1_from_env(tba: tba.Tba) -> Blue1:
         exit(1)
 
     logging.log("BOT", "Got Discord API key from enviorment")
-    return Blue1(API_TOKEN, tba)
+    return Blue1(API_TOKEN)
 
 
 async def check_priviledges(ctx):
