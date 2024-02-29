@@ -524,29 +524,29 @@ class Blue1:
             await ctx.send("DBG logs will no longer be written to `stdout`")
         
 
-        @self.bot.command()
+        @self.bot.command(brief="This is the real help menu, with proper usage of all commands.")
         async def print_help(ctx):
             help0 = (
-                "To use `blue1` command prefix them with `&`, here are the avaiable commands:\n"
-                + "`&get_team [team_number]` - Gets basic team info given their number\n"
-                + "`&get_match [match_id]` - Gets match info, `[match_id]` is in the format `2023cabl_qm60`, which is the event ID and match ID seperated by an underscore, match IDs are formated `qm[num]`, `sf[num]m[num]`, and `f[num]m[num]`. The first number always refers to a set between the same teams, so finals are usually `f1m[1-3]`. Semifinals usually end in `1`.\n"
-                + "`&get_event [event_id]` - Gets event info, `[event_id]` is in the format `[year][state_or_province_abr][event_abr]`, e.g. Beach Blitch in 2023 was `2023cabl`\n"
-                + "`&get_team_rank [team_number] [event_id]` - Plots info about a teams rank for an event, see above for argument format.\n"
-                + "`&get_event_rankings [event_id]` - gets the rankings of all teams at an event. See above for argument format.\n"
-                + "`&get_event_matches [event_id]` - Gets a summary of all matches played at the given event. See above for argument format.\n"
-                + "`&get_team_event [team_number] [event_id]` - Gets a summary of all matches a team played during an event, and plots their score over time. See above for argument format.\n"
+                "To use `blue1` command prefix them with `&`, here are the avaiable commands:\n\n"
+                + "`&get_team [team_number]` - Gets basic team info given their number\n\n"
+                + "`&get_match [match_id]` - Gets match info, `[match_id]` is in the format `2023cabl_qm60`, which is the event ID and match ID seperated by an underscore, match IDs are formated `qm[num]`, `sf[num]m[num]`, and `f[num]m[num]`. The first number always refers to a set between the same teams, so finals are usually `f1m[1-3]`. Semifinals usually end in `1`.\n\n"
+                + "`&get_event [event_id]` - Gets event info, `[event_id]` is in the format `[year][state_or_province_abr][event_abr]`, e.g. Beach Blitch in 2023 was `2023cabl`\n\n"
+                + "`&get_team_rank [team_number] [event_id]` - Plots info about a teams rank for an event, see above for argument format.\n\n"
+                + "`&get_event_rankings [event_id]` - gets the rankings of all teams at an event. See above for argument format.\n\n"
+                + "`&get_event_matches [event_id]` - Gets a summary of all matches played at the given event. See above for argument format.\n\n"
+                + "`&get_team_event [team_number] [event_id]` - Gets a summary of all matches a team played during an event, and plots their score over time. See above for argument format.\n\n"
             )
 
             help1 = (
-                "`&compare_teams_event [team_number] [team_number] [event_id]` - Compares two teams performance at an event. See above for argument format.\n"
-                + "`&get_scouting_fields [event_id]` - Gets available fields for an event. NOTE: Requires a scouting sheet be set for the given event.\n"
-                + "`&plot_scouting_field [event_id] [team_number] [field]` - Plots a numeric field from scouting data, you may have to wrap the `[field]` argument in quotes if it contains spaces. NOTE: Requires a scouting sheet be set for the given event.\n"
-                + "`&match_breakdown [event_id] [match_number] [team_number]` - Gives a match breakdown from scouting data. `[match_number]` is the match number given in scouting forms, not from TBA. NOTE: Requires a scouting sheet be set for the given event.\n"
-                + "`&notify_rank_change [event_id] [team_number]` - *Requires Priviledged Role.* Notifies with a ping to everyone when the given team's rank changes at this given event.\n"
-                + "`&set_scouting_sheet [event_id] [sheet_id]` - *Requires Priviledged Role.* Sets the scouting sheet for the given event.\n"
-                + "`&set_cache_expiration_time [time] [unit]` - *Requires Priviledged Role.* Sets the time till a cache item is considered expired.\n"
+                "`&compare_teams_event [team_number] [team_number] [event_id]` - Compares two teams performance at an event. See above for argument format.\n\n"
+                + "`&get_scouting_fields [event_id]` - Gets available fields for an event. NOTE: Requires a scouting sheet be set for the given event.\n\n"
+                + "`&plot_scouting_field [event_id] [team_number] [field]` - Plots a numeric field from scouting data, you may have to wrap the `[field]` argument in quotes if it contains spaces. NOTE: Requires a scouting sheet be set for the given event.\n\n"
+                + "`&match_breakdown [event_id] [match_number] [team_number]` - Gives a match breakdown from scouting data. `[match_number]` is the match number given in scouting forms, not from TBA. NOTE: Requires a scouting sheet be set for the given event.\n\n"
+                + "`&notify_rank_change [event_id] [team_number]` - *Requires Priviledged Role.* Notifies with a ping to everyone when the given team's rank changes at this given event.\n\n"
+                + "`&set_scouting_sheet [event_id] [sheet_id]` - *Requires Priviledged Role.* Sets the scouting sheet for the given event.\n\n"
+                + "`&set_cache_expiration_time [time] [unit]` - *Requires Priviledged Role.* Sets the time till a cache item is considered expired.\n\n"
                 + "`&get_cache_hit_rate` - Yeilds the rate at which cache items are used in favor of sending a new request to an API.\n"
-                + "`&enable_dbg` - *Requires Priviledged Role.* Enables the printing of DBG logs to stdout.\n"
+                + "`&enable_dbg` - *Requires Priviledged Role.* Enables the printing of DBG logs to stdout.\n\n"
                 + "`&disable_dbg` - *Requires Priviledged Role.* Disables the printing of DBG logs to stdout."
             )
 
