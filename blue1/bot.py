@@ -21,6 +21,7 @@ from . import sheets
 from . import data
 from . import logging
 from . import events
+from . import assessment
 
 API_TOKEN_ENV_VAR = 'BLUE1_DISCORD_API_TOKEN'
 API_TOKEN: str = os.getenv(API_TOKEN_ENV_VAR)
@@ -253,6 +254,12 @@ class Blue1:
                 
             await self.plot_line(ctx, team_scores, 'matches played', f"team {team_number}'s score")
 
+
+        @self.bot.command()
+        async def assess_team(ctx, team_number, event_id):
+            s = assessment.assess_team(team_number, event_id)
+            await ctx.send(s)
+        
 
         @self.bot.command()
         async def compare_teams_event(ctx, team1_number, team2_number, event_id):
@@ -538,6 +545,7 @@ class Blue1:
             )
 
             help1 = (
+                "`&assess_team [team_number] [event_id]` - Blue1 performs a slightly more in depth assessment of the team to give average scores, win rates, and variance in scores.\n\n"
                 "`&compare_teams_event [team_number] [team_number] [event_id]` - Compares two teams performance at an event. See above for argument format.\n\n"
                 + "`&get_scouting_fields [event_id]` - Gets available fields for an event. NOTE: Requires a scouting sheet be set for the given event.\n\n"
                 + "`&plot_scouting_field [event_id] [team_number] [field]` - Plots a numeric field from scouting data, you may have to wrap the `[field]` argument in quotes if it contains spaces. NOTE: Requires a scouting sheet be set for the given event.\n\n"

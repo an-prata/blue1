@@ -174,11 +174,26 @@ class Match:
         in the `Match`.
         """
 
-        if team_number in self.red_alliance_teams:
+        if int(team_number) in self.red_alliance_teams:
             return self.red_alliance_score
 
-        if team_number in self.blue_alliance_teams:
+        if int(team_number) in self.blue_alliance_teams:
             return self.blue_alliance_score
+
+        return None
+
+    
+    def did_team_win(self, team_number: int) -> Optional[bool]:
+        """
+        Gets the score of the given team's alliance, or `None` if they were not
+        in the `Match`.
+        """
+
+        if int(team_number) in self.red_alliance_teams:
+            return self.winning_alliance == 'red'
+
+        if int(team_number) in self.blue_alliance_teams:
+            return self.winning_alliance == 'blue'
 
         return None
 
